@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Copied from BurntSushis version in
+# https://github.com/BurntSushi/advent-of-code/blob/93fc69250fb14ce30fee1bdc39daa4109797dfd2/setup-day
+
+YEAR=2018
+
+if [ $# != 1 ]; then
+    echo "Usage: $(basename "$0") <day-number>" >&2
+    exit 1
+fi
+if [ ! -d .git ]; then
+    echo "must be run from root of advent-of-code repository" >&2
+    exit 1
+fi
+
+name="$(printf "aoc%02d" "$1")"
+cargo new --bin "$YEAR/$name"
+mkdir "$YEAR/$name/input"
