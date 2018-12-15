@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     error::Error,
     io::{self, Read},
     str::FromStr,
@@ -8,24 +8,27 @@ use std::{
 use lazy_static::lazy_static;
 use regex::Regex;
 
-pub type Result<ContentT> = std::result::Result<ContentT, Box<dyn Error>>;
+type Result<ContentT> = std::result::Result<ContentT, Box<dyn Error>>;
+type FabricPlan = HashMap<(u32, u32), Vec<u32>>;
 
 fn main() -> Result<()> {
     let mut input = String::new();
     io::stdin().read_to_string(&mut input)?;
 
     let claims: Vec<Claim> = input.split('\n').map(Claim::from_str).flatten().collect();
-    let fabric_plan = generate_fabric_plan(&claims)?;
+    let plan = generate_plan(&claims)?;
 
-    let num_squares = calc_overlapping_squares(&fabric_plan)?;
+    let num_squares = calc_overlapping_squares(&plan)?;
     println!("num squares: {}", num_squares);
+
+    let unique_claim_id = find_unique_claim(&plan, &claims)?;
+    println!("id of the unique claim: {}", unique_claim_id);
 
     Ok(())
 }
 
-
-fn generate_fabric_plan(claims: &[Claim]) -> Result<HashMap<(u32, u32), u32>> {
-    let mut fabric_plan = HashMap::<(u32, u32), u32>::new();
+fn generate_plan(claims: &[Claim]) -> Result<FabricPlan> {
+    let mut plan = FabricPlan::new();
 
     for claim in claims {
         let (x, y) = claim.origin;
@@ -33,18 +36,34 @@ fn generate_fabric_plan(claims: &[Claim]) -> Result<HashMap<(u32, u32), u32>> {
 
         for x_index in x..(x + width) {
             for y_index in y..(y + height) {
-                let counter = fabric_plan.entry((x_index, y_index)).or_insert(0);
-                *counter += 1;
+                let ids = plan.entry((x_index, y_index)).or_insert_with(|| vec![]);
+                ids.push(claim.id);
             }
         }
     }
 
-    Ok(fabric_plan)
+    Ok(plan)
 }
 
-fn calc_overlapping_squares(fabric_plan: &HashMap<(u32, u32), u32>) -> Result<usize> {
-    let overlapping = fabric_plan.values().filter(|&&counter| counter > 1).count();
+fn calc_overlapping_squares(plan: &FabricPlan) -> Result<usize> {
+    let overlapping = plan.values().filter(|ids| ids.len() > 1).count();
     Ok(overlapping)
+}
+
+fn find_unique_claim(plan: &FabricPlan, claims: &[Claim]) -> Result<u32> {
+    let overlapping_ids: HashSet<&u32> = plan
+        .values()
+        .filter(|ids| ids.len() > 1)
+        .flatten()
+        .collect();
+
+    let unique_claim = claims
+        .iter()
+        .filter(|claim| !overlapping_ids.contains(&claim.id))
+        .last()
+        .ok_or_else(|| "Couldn't determine any unique claim.".to_string())?;
+
+    Ok(unique_claim.id)
 }
 
 // -----------------------------------------------------------------------------
@@ -52,7 +71,7 @@ fn calc_overlapping_squares(fabric_plan: &HashMap<(u32, u32), u32>) -> Result<us
 // -----------------------------------------------------------------------------
 
 pub struct Claim {
-    _id: u32,
+    id: u32,
     origin: (u32, u32),
     size: (u32, u32),
 }
@@ -71,10 +90,10 @@ impl FromStr for Claim {
             .captures(input)
             .ok_or_else(|| format!("Couldn't parse claim line: {}", input))?;
 
-        let _id = capture["id"].parse()?;
+        let id = capture["id"].parse()?;
         let origin = (capture["origin_x"].parse()?, capture["origin_y"].parse()?);
         let size = (capture["width"].parse()?, capture["height"].parse()?);
 
-        Ok(Claim { _id, origin, size })
+        Ok(Claim { id, origin, size })
     }
 }
