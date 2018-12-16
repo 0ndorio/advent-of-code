@@ -21,6 +21,10 @@ fn main() -> Result<()> {
 
     let first_metric = calc_sleepiest_guard_metric(&overview);
     println!("Metric for the first strategy: {}", first_metric);
+
+    let second_metric = calc_max_sleep_period_metric(&overview);
+    println!("Metric for the second strategy: {}", second_metric);
+
     Ok(())
 }
 
@@ -74,6 +78,29 @@ fn calc_sleepiest_guard_metric(overview: &Overview) -> usize {
             sleeping_periods_lhs.cmp(sleeping_periods_rhs)
         })
         .expect("Every guard entry should contain 60 values");
+
+    (*id as usize) * minute
+}
+
+fn calc_max_sleep_period_metric(overview: &Overview) -> usize {
+    let (id, (minute, _))= overview
+        .iter()
+        .map(|(id, (_, log))| (id, log))
+        .map(|(id, log)| {
+            let max_sleeping_period = log
+                .iter()
+                .enumerate()
+                .max_by(|(_, sleeping_periods_lhs), (_, sleeping_periods_rhs)| {
+                    sleeping_periods_lhs.cmp(sleeping_periods_rhs)
+                })
+                .expect("Every guard entry should contain 60 values");
+
+            (id, max_sleeping_period)
+        })
+        .max_by(|(_, (_, sleeping_periods_lhs)), (_, (_, sleeping_periods_rhs))| {
+            sleeping_periods_lhs.cmp(sleeping_periods_rhs)
+        })
+        .expect("Overview should contain at least one guard.");
 
     (*id as usize) * minute
 }
