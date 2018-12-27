@@ -5,12 +5,11 @@ use std::{
     str::FromStr,
 };
 
-type Result<ContentT> = std::result::Result<ContentT, Box<dyn Error>>;
+mod coordinate;
+use crate::coordinate::{Coordinate, Distance, Grid};
 
-struct Coordinate {
-    x: u32,
-    y: u32,
-}
+type Result<ContentT> = std::result::Result<ContentT, Box<dyn Error>>;
+type Identifier = usize;
 
 fn main() -> Result<()> {
     let mut input = String::new();
@@ -19,96 +18,88 @@ fn main() -> Result<()> {
     let coordinates: Vec<Coordinate> = input
         .lines()
         .map(Coordinate::from_str)
-        .collect::<Result<Vec<_>>>()?;
+        .collect::<Result<_>>()?;
 
-    let ownership = calc_coordinate_ownership(&coordinates);
+    let distances = calc_distances(&coordinates);
 
-    let max_area = ownership
-        .iter()
-        .filter(|(_, (_, owns_border))| !*owns_border)
-        .max_by_key(|(_, (owned_tiles, _))| *owned_tiles)
-        .ok_or("Couldn't determine any finite area.")?;
+    let max_area = find_max_finite_area(&distances)?;
+    println!("Max finite area {} with {}", max_area.0, max_area.1);
 
-    println!("Max finite area {} with {}", max_area.0, (max_area.1).0);
+    let area_size = find_area_with_distances_under(&distances, 10000);
+    println!("Area size: {}", area_size);
 
     Ok(())
 }
 
-fn calc_coordinate_ownership(coordinates: &[Coordinate]) -> HashMap<usize, (u32, bool)> {
-    let width = coordinates
+fn calc_distances(spots: &[Coordinate]) -> Grid {
+    let width = spots
         .iter()
         .map(|coordinate| coordinate.x)
         .max()
         .expect("We always operate on at least one coordinate");
 
-    let height = coordinates
+    let height = spots
         .iter()
         .map(|coordinate| coordinate.y)
         .max()
         .expect("We always operate on at least one coordinate");
 
-    let mut ownership: HashMap<usize, (u32, bool)> = HashMap::new();
-
+    let mut distance_overview = HashMap::new();
     for x in 0..=width {
         for y in 0..=height {
             let border_tile = x == 0 || y == 0 || x == width || y == height;
+            let tile = Coordinate { x, y, border_tile };
 
-            let current = Coordinate { x, y };
-            let owner = coordinates
+            let owner: HashMap<Identifier, Distance> = spots
                 .iter()
-                .map(|coordinate| coordinate.distance(&current))
+                .map(|coordinate| coordinate.distance(&tile))
                 .enumerate()
-                .fold(vec![], |mut min, next| {
-                    match min.first() {
-                        None => min.push(next),
-                        Some(old) => {
-                            if next.1 == old.1 {
-                                min.push(next);
-                            } else if next.1 < old.1 {
-                                min.clear();
-                                min.push(next);
-                            }
-                        }
-                    }
+                .collect();
 
-                    min
-                });
-
-            if owner.len() == 1 {
-                if let Some((index, _)) = owner.first() {
-                    let territory = ownership.entry(*index).or_insert((0u32, false));
-                    territory.0 += 1u32;
-                    territory.1 |= border_tile;
-                }
-            }
+            distance_overview.insert(tile, owner);
         }
     }
 
-    ownership
+    distance_overview
 }
 
-impl Coordinate {
-    fn distance(&self, target: &Coordinate) -> u32 {
-        let x_distance = self.x.max(target.x) - self.x.min(target.x);
-        let y_distance = self.y.max(target.y) - self.y.min(target.y);
+fn find_max_finite_area(grid: &Grid) -> Result<(Identifier, usize)> {
 
-        x_distance + y_distance
-    }
+    let mut ownership = HashMap::new();
+
+    grid
+        .iter()
+        .map(|(coordinate, distances)| {
+            let potential_owner = coordinate::find_owner(&distances);
+            (coordinate, potential_owner)
+        })
+        .for_each(|(coordinate, potential_owner)| {
+            match potential_owner {
+                None => (),
+                Some(identifier) => {
+                    let coordinates = ownership.entry(identifier).or_insert(vec![]);
+                    coordinates.push(coordinate);
+                }
+            }
+        });
+
+    let (identifier, coordinates) = ownership
+        .into_iter()
+        .filter(|(_, coordinates)| {
+            coordinates
+                .iter()
+                .all(|coordinate| !coordinate.border_tile)
+        })
+        .max_by_key(|(_, coordinates)| coordinates.len())
+        .ok_or(format!("Couldn't determine the size of any finite area."))?;
+
+    Ok((identifier, coordinates.len()))
 }
 
-impl FromStr for Coordinate {
-    type Err = Box<dyn Error>;
-
-    fn from_str(input: &str) -> Result<Self> {
-        let mut values = input.split(',').map(str::trim).flat_map(str::parse::<u32>);
-
-        let x = values
-            .next()
-            .ok_or_else(|| "Couldn't parse x-value.".to_string())?;
-        let y = values
-            .next()
-            .ok_or_else(|| "Couldn't parse y-value.".to_string())?;
-
-        Ok(Self { x, y })
-    }
+fn find_area_with_distances_under(grid: &Grid, upper_limit: u32) -> usize {
+    grid
+        .values()
+        .map(coordinate::total_distance)
+        .filter(|distance| distance < &upper_limit)
+        .count()
 }
