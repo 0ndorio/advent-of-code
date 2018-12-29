@@ -83,7 +83,7 @@ fn calc_sleepiest_guard_metric(overview: &Overview) -> usize {
 }
 
 fn calc_max_sleep_period_metric(overview: &Overview) -> usize {
-    let (id, (minute, _))= overview
+    let (id, (minute, _)) = overview
         .iter()
         .map(|(id, (_, log))| (id, log))
         .map(|(id, log)| {
@@ -97,9 +97,11 @@ fn calc_max_sleep_period_metric(overview: &Overview) -> usize {
 
             (id, max_sleeping_period)
         })
-        .max_by(|(_, (_, sleeping_periods_lhs)), (_, (_, sleeping_periods_rhs))| {
-            sleeping_periods_lhs.cmp(sleeping_periods_rhs)
-        })
+        .max_by(
+            |(_, (_, sleeping_periods_lhs)), (_, (_, sleeping_periods_rhs))| {
+                sleeping_periods_lhs.cmp(sleeping_periods_rhs)
+            },
+        )
         .expect("Overview should contain at least one guard.");
 
     (*id as usize) * minute
