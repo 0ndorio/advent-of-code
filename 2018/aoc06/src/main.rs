@@ -64,42 +64,33 @@ fn calc_distances(spots: &[Coordinate]) -> Grid {
 }
 
 fn find_max_finite_area(grid: &Grid) -> Result<(Identifier, usize)> {
-
     let mut ownership = HashMap::new();
 
-    grid
-        .iter()
+    grid.iter()
         .map(|(coordinate, distances)| {
             let potential_owner = coordinate::find_owner(&distances);
             (coordinate, potential_owner)
         })
-        .for_each(|(coordinate, potential_owner)| {
-            match potential_owner {
-                None => (),
-                Some(identifier) => {
-                    let coordinates = ownership.entry(identifier).or_insert(vec![]);
-                    coordinates.push(coordinate);
-                }
+        .for_each(|(coordinate, potential_owner)| match potential_owner {
+            None => (),
+            Some(identifier) => {
+                let coordinates = ownership.entry(identifier).or_insert_with(Vec::new);
+                coordinates.push(coordinate);
             }
         });
 
     let (identifier, coordinates) = ownership
         .into_iter()
-        .filter(|(_, coordinates)| {
-            coordinates
-                .iter()
-                .all(|coordinate| !coordinate.border_tile)
-        })
+        .filter(|(_, coordinates)| coordinates.iter().all(|coordinate| !coordinate.border_tile))
         .max_by_key(|(_, coordinates)| coordinates.len())
-        .ok_or(format!("Couldn't determine the size of any finite area."))?;
+        .ok_or_else(|| "Couldn't determine the size of any finite area.".to_string())?;
 
     Ok((identifier, coordinates.len()))
 }
 
 fn find_area_with_distances_under(grid: &Grid, upper_limit: u32) -> usize {
-    grid
-        .values()
+    grid.values()
         .map(coordinate::total_distance)
-        .filter(|distance| distance < &upper_limit)
+        .filter(|&distance| distance < upper_limit)
         .count()
 }

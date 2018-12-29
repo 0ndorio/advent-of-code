@@ -1,6 +1,6 @@
-use std::{str::FromStr, error::Error, collections::HashMap};
+use std::{collections::HashMap, error::Error, str::FromStr};
 
-use crate::{Result, Identifier};
+use crate::{Identifier, Result};
 
 pub type Grid = HashMap<Coordinate, DistanceInformation>;
 pub type DistanceInformation = HashMap<Identifier, Distance>;
@@ -42,31 +42,27 @@ impl FromStr for Coordinate {
 }
 
 pub fn find_owner(distances: &DistanceInformation) -> Option<Identifier> {
-    let owner = distances
-        .iter()
-        .fold(vec![], |mut owner, next| {
-            match owner.first() {
-                None => owner.push(next),
-                Some(old) => {
-                    if next.1 == old.1 {
-                        owner.push(next);
-                    } else if next.1 < old.1 {
-                        owner.clear();
-                        owner.push(next);
-                    }
+    let owner = distances.iter().fold(vec![], |mut owner, next| {
+        match owner.first() {
+            None => owner.push(next),
+            Some(old) => {
+                if next.1 == old.1 {
+                    owner.push(next);
+                } else if next.1 < old.1 {
+                    owner.clear();
+                    owner.push(next);
                 }
             }
+        }
 
-            owner
-        });
+        owner
+    });
 
-    let owner = if owner.len() != 1 {
+    if owner.len() != 1 {
         None
     } else {
         owner.first().map(|(identifier, _)| **identifier)
-    };
-
-    owner
+    }
 }
 
 pub fn total_distance(distances: &DistanceInformation) -> u32 {
