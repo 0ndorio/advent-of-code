@@ -15,6 +15,9 @@ fn main() -> Result<()> {
     let sum = root.sum_meta_data();
     println!("Meta value sum: {}", sum);
 
+    let sum = root.calc_value();
+    println!("Value of the root node: {}", sum);
+
     Ok(())
 }
 
@@ -70,6 +73,22 @@ impl Node {
         }
 
         value
+    }
+
+    fn calc_value(&self) -> u32 {
+        if self.children.is_empty() {
+            return self.meta_data.iter().sum();
+        }
+
+        self.meta_data
+            .iter()
+            .filter(|&&value| value > 0)
+            .map(|&value| {
+                self.children
+                    .get((value - 1) as usize)
+                    .map_or(0, Node::calc_value)
+            })
+            .sum()
     }
 }
 
