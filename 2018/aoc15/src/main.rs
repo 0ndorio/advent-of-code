@@ -1,8 +1,8 @@
 mod game;
 mod location;
 mod map;
-mod player;
 mod tile;
+mod unit;
 
 use std::{
     error::Error,
@@ -10,7 +10,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::{game::Game, map::Map, player::Race};
+use crate::{game::Game, unit::Race};
 
 type Result<ContentT> = std::result::Result<ContentT, Box<dyn Error>>;
 
@@ -18,10 +18,8 @@ fn main() -> Result<()> {
     let mut input = String::new();
     io::stdin().read_to_string(&mut input)?;
 
-    let map = Map::from_str(&input)?;
-    let game = Game::new(map);
-
-    let (num_turns, winner, hp_lfeft) = game.clone().run();
+    let mut game = Game::from_str(&input)?;
+    let (num_turns, winner, hp_lfeft) = game.run();
     println!(
         "{:?} won after {} total turns with {} hp left.",
         winner, num_turns, hp_lfeft
@@ -43,8 +41,7 @@ pub fn cheat_until_elves_win(input: &str) -> Result<(u32, Race, u32)> {
     loop {
         elf_attack_power += 1;
 
-        let map = Map::from_str(&input)?;
-        let mut game = Game::new(map);
+        let mut game = Game::from_str(&input)?;
         game.set_elf_attack_power(elf_attack_power);
 
         let total_num_elves = game.count_elves();

@@ -1,7 +1,9 @@
+use std::fmt::{self, Display, Formatter};
+
 use crate::{location::Location, Result};
 
 #[derive(Debug)]
-pub struct Player {
+pub struct Unit {
     pub attack_power: u32,
     pub hit_points: u32,
     pub race: Race,
@@ -14,11 +16,11 @@ pub enum Race {
     Gnome,
 }
 
-impl Player {
+impl Unit {
     pub fn from_char(symbol: char) -> Result<Self> {
         let race = Race::from_char(symbol)?;
 
-        Ok(Player {
+        Ok(Unit {
             race,
             attack_power: 3,
             hit_points: 200,
@@ -26,12 +28,8 @@ impl Player {
         })
     }
 
-    pub fn to_char(&self) -> char {
-        self.race.to_char()
-    }
-
     /// Returns true if the target dies through the attack.
-    pub fn attack(&self, target: &mut Player) -> bool {
+    pub fn attack(&self, target: &mut Unit) -> bool {
         if target.hit_points < self.attack_power {
             target.hit_points = 0;
         } else {
@@ -62,5 +60,11 @@ impl Race {
             Race::Elf => 'E',
             Race::Gnome => 'G',
         }
+    }
+}
+
+impl Display for Unit {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        self.race.to_char().fmt(f)
     }
 }
