@@ -31,6 +31,14 @@ impl Executor {
         self
     }
 
+    pub fn with_instructions<Instructions>(mut self, instructions: Instructions) -> Self
+    where
+        Instructions: IntoIterator<Item = Instruction>,
+    {
+        self.instructions.extend(instructions);
+        self
+    }
+
     pub fn run(&mut self) -> &State {
         while let Some(instruction) = self.instructions.pop_front() {
             self.exec(instruction);
@@ -86,7 +94,7 @@ struct Addi;
 
 impl Operation for Addi {
     fn exec(a: u8, b: u8, c: u8, state: &mut State) {
-        state[c] = state[a] + b;
+        state[c] = state[a] + u32::from(b);
     }
 }
 
@@ -104,7 +112,7 @@ struct Muli;
 
 impl Operation for Muli {
     fn exec(a: u8, b: u8, c: u8, state: &mut State) {
-        state[c] = state[a] * b;
+        state[c] = state[a] * u32::from(b);
     }
 }
 
@@ -122,7 +130,7 @@ struct Bani;
 
 impl Operation for Bani {
     fn exec(a: u8, b: u8, c: u8, state: &mut State) {
-        state[c] = state[a] & b;
+        state[c] = state[a] & u32::from(b);
     }
 }
 
@@ -140,7 +148,7 @@ struct Bori;
 
 impl Operation for Bori {
     fn exec(a: u8, b: u8, c: u8, state: &mut State) {
-        state[c] = state[a] | b;
+        state[c] = state[a] | u32::from(b);
     }
 }
 
@@ -158,7 +166,7 @@ struct Seti;
 
 impl Operation for Seti {
     fn exec(a: u8, _b: u8, c: u8, state: &mut State) {
-        state[c] = a;
+        state[c] = u32::from(a);
     }
 }
 
@@ -167,7 +175,7 @@ struct Gtir;
 
 impl Operation for Gtir {
     fn exec(a: u8, b: u8, c: u8, state: &mut State) {
-        state[c] = (a > state[b]) as u8;
+        state[c] = (u32::from(a) > state[b]) as u32;
     }
 }
 
@@ -176,7 +184,7 @@ struct Gtri;
 
 impl Operation for Gtri {
     fn exec(a: u8, b: u8, c: u8, state: &mut State) {
-        state[c] = (state[a] > b) as u8;
+        state[c] = (state[a] > u32::from(b)) as u32;
     }
 }
 
@@ -185,7 +193,7 @@ struct Gtrr;
 
 impl Operation for Gtrr {
     fn exec(a: u8, b: u8, c: u8, state: &mut State) {
-        state[c] = (state[a] > state[b]) as u8;
+        state[c] = (state[a] > state[b]) as u32;
     }
 }
 
@@ -194,7 +202,7 @@ struct Eqir;
 
 impl Operation for Eqir {
     fn exec(a: u8, b: u8, c: u8, state: &mut State) {
-        state[c] = (a == state[b]) as u8;
+        state[c] = (u32::from(a) == state[b]) as u32;
     }
 }
 
@@ -203,7 +211,7 @@ struct Eqri;
 
 impl Operation for Eqri {
     fn exec(a: u8, b: u8, c: u8, state: &mut State) {
-        state[c] = (state[a] == b) as u8;
+        state[c] = (state[a] == u32::from(b)) as u32;
     }
 }
 
@@ -212,6 +220,6 @@ struct Eqrr;
 
 impl Operation for Eqrr {
     fn exec(a: u8, b: u8, c: u8, state: &mut State) {
-        state[c] = (state[a] == state[b]) as u8;
+        state[c] = (state[a] == state[b]) as u32;
     }
 }

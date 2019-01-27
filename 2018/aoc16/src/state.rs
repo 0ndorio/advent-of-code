@@ -10,7 +10,7 @@ use regex::Regex;
 use crate::Result;
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct State(pub u8, pub u8, pub u8, pub u8);
+pub struct State(pub u32, pub u32, pub u32, pub u32);
 
 impl Default for State {
     fn default() -> Self {
@@ -19,7 +19,7 @@ impl Default for State {
 }
 
 impl Index<u8> for State {
-    type Output = u8;
+    type Output = u32;
 
     fn index(&self, index: u8) -> &Self::Output {
         match index {
