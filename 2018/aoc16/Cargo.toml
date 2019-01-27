@@ -1,0 +1,10 @@
+[package]
+name = "aoc16"
+version = "0.1.0"
+authors = ["Bruno Kirschner <bruno.kirschner@online.de>"]
+edition = "2018"
+
+[dependencies]
+lazy_static = "^1.2.0"
+regex = "^1.1.0"
+
