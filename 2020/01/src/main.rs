@@ -1,6 +1,8 @@
 #![deny(clippy::pedantic)]
+#![feature(min_const_generics)]
 
 use itertools::Itertools;
+use std::convert::TryInto;
 use std::env;
 use std::fs;
 use std::str::FromStr;
@@ -9,24 +11,32 @@ type Error = Box<dyn std::error::Error>;
 
 fn main() -> Result<(), Error> {
     let numbers: Vec<u32> = parse_input()?;
-    let result = find_entries_adding_to_2020(numbers);
 
-    println!("{}", result);
+    let [first, second] = find_entries_adding_to_2020::<2>(&numbers)
+        .expect("Couldn't determine a result for task 1.");
+
+    println!("Task 1: {} * {} == {}", first, second, first * second);
+
+    let [first, second, third] = find_entries_adding_to_2020::<3>(&numbers)
+        .expect("Couldn't determine a result for task 2.");
+
+    println!(
+        "Task 2: {} * {} * {} == {}",
+        first,
+        second,
+        third,
+        first * second * third
+    );
     Ok(())
 }
 
-fn find_entries_adding_to_2020(expenses: Vec<u32>) -> u64 {
-    for (idx, entry) in expenses.iter().enumerate() {
-        let (_, remaining_entries) = expenses.split_at(idx);
+fn find_entries_adding_to_2020<const SIZE: usize>(expenses: &[u32]) -> Option<[u32; SIZE]> {
+    let result = expenses
+        .iter()
+        .permutations(SIZE)
+        .find(|entries| entries.iter().fold(0, |a, &b| a + b) == 2020)?;
 
-        for other_entry in remaining_entries {
-            if entry + other_entry == 2020 {
-                return (*entry as u64) * (*other_entry as u64);
-            }
-        }
-    }
-
-    return 0;
+    result.into_iter().cloned().collect_vec().try_into().ok()
 }
 
 fn parse_input<ResultT>() -> Result<Vec<ResultT>, Error>
@@ -50,10 +60,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn check_task_1_dummy_input() {
-        let numbers = vec![1721, 979, 366, 299, 657, 1456];
-        let result = find_entries_adding_to_2020(numbers);
+    fn check_two_numbers_adding_to_2020() {
+        let numbers = vec![1721, 979, 366, 299, 675, 1456];
+        let [first, second] = find_entries_adding_to_2020::<2>(&numbers).unwrap();
 
-        assert_eq!(514579, result);
+        assert_eq!(514579, first * second);
+    }
+
+    #[test]
+    fn check_three_numbers_adding_to_2020() {
+        let numbers = vec![1721, 979, 366, 299, 675, 1456];
+        let [first, second, third] = find_entries_adding_to_2020::<3>(&numbers).unwrap();
+
+        assert_eq!(241861950, first * second * third);
     }
 }
