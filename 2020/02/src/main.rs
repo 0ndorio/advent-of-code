@@ -12,12 +12,22 @@ use nom::IResult;
 fn main() -> Result<(), Error> {
     let password_entries: Vec<PasswordEntry> = parse_input()?;
 
-    let num_valid_passwords = password_entries
+    let num_valid_sled_passwords = password_entries
         .iter()
-        .map(PasswordEntry::is_valid)
+        .map(PasswordEntry::is_valid_at_sled_rental)
         .filter(|&value| value)
         .count();
-    println!("Num Valid Passwords: {}", num_valid_passwords);
+    println!("Num Valid Sled Passwords: {}", num_valid_sled_passwords);
+
+    let num_valid_toboggan_passwords = password_entries
+        .iter()
+        .map(PasswordEntry::is_valid_at_toboggan_rental)
+        .filter(|&value| value)
+        .count();
+    println!(
+        "Num Valid Toboggan Passwords: {}",
+        num_valid_toboggan_passwords
+    );
 
     Ok(())
 }
@@ -32,7 +42,7 @@ struct PasswordEntry {
 }
 
 impl PasswordEntry {
-    fn is_valid(&self) -> bool {
+    fn is_valid_at_sled_rental(&self) -> bool {
         let count = self
             .password
             .as_str()
@@ -41,6 +51,23 @@ impl PasswordEntry {
             .count();
 
         self.rule.range.contains(&count)
+    }
+
+    fn is_valid_at_toboggan_rental(&self) -> bool {
+        let &first_position = self.rule.range.start();
+        let &second_position = self.rule.range.end();
+
+        let chars = self.password.as_bytes();
+
+        let first = chars
+            .get(first_position - 1)
+            .map_or(false, |&c| c == self.rule.character as u8);
+
+        let second = chars
+            .get(second_position - 1)
+            .map_or(false, |&c| c == self.rule.character as u8);
+
+        first ^ second
     }
 }
 
@@ -139,17 +166,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn check_example_passwords() -> Result<(), Error> {
+    fn check_example_passwords_for_sled_rental() -> Result<(), Error> {
         let entries = vec!["1-3 a: abcde", "1-3 b: cdefg", "2-9 c: ccccccccc"];
 
         let entry = entries[0].parse::<PasswordEntry>()?;
-        assert!(entry.is_valid());
+        assert!(entry.is_valid_at_sled_rental());
 
         let entry = entries[1].parse::<PasswordEntry>()?;
-        assert!(!entry.is_valid());
+        assert!(!entry.is_valid_at_sled_rental());
 
         let entry = entries[2].parse::<PasswordEntry>()?;
-        assert!(entry.is_valid());
+        assert!(entry.is_valid_at_sled_rental());
+
+        Ok(())
+    }
+
+    #[test]
+    fn check_example_passwords_for_toboggan_rental() -> Result<(), Error> {
+        let entries = vec!["1-3 a: abcde", "1-3 b: cdefg", "2-9 c: ccccccccc"];
+
+        let entry = entries[0].parse::<PasswordEntry>()?;
+        assert!(entry.is_valid_at_toboggan_rental());
+
+        let entry = entries[1].parse::<PasswordEntry>()?;
+        assert!(!entry.is_valid_at_toboggan_rental());
+
+        let entry = entries[2].parse::<PasswordEntry>()?;
+        assert!(!entry.is_valid_at_toboggan_rental());
 
         Ok(())
     }
