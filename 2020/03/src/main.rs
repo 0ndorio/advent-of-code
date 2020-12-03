@@ -8,8 +8,13 @@ fn main() -> Result<(), Error> {
     let rows = parse_input::<Row>()?;
     let map = Map(rows);
 
-    let num_trees = map.count_trees();
-    println!("Num Trees for 3x1 slope: {}", num_trees);
+    let slopes = [(1, 1), (3, 1), (5, 1), (7, 1), (1, 2)];
+    let num_trees = slopes
+        .iter()
+        .map(|slope| map.count_trees(slope))
+        .product::<u128>();
+
+    println!("Total Number of Trees: {}", num_trees);
 
     Ok(())
 }
@@ -22,9 +27,8 @@ fn main() -> Result<(), Error> {
 struct Map(pub Vec<Row>);
 
 impl Map {
-    fn count_trees(&self) -> u32 {
+    fn count_trees(&self, slope: &(usize, usize)) -> u128 {
         let target_depth = self.0.len();
-        let slope = (3, 1);
 
         let mut num_trees = 0;
         let mut position = (0, 0);
@@ -148,9 +152,7 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn count_trees_in_3_1_slope() -> Result<(), Error> {
-        let map = r#"..##.......
+    const MAP: &str = r#"..##.......
                           #...#...#..
                           .#....#..#.
                           ..#.#...#.#
@@ -162,8 +164,42 @@ mod tests {
                           #...##....#
                           .#..#...#.#"#;
 
-        let map = Map::from_str(map)?;
-        assert_eq!(7, map.count_trees());
+    #[test]
+    fn count_trees_in_3_1_slope() -> Result<(), Error> {
+        let map = Map::from_str(MAP)?;
+        assert_eq!(7, map.count_trees(&(3, 1)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn count_trees_in_1_1_slope() -> Result<(), Error> {
+        let map = Map::from_str(MAP)?;
+        assert_eq!(2, map.count_trees(&(1, 1)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn count_trees_in_5_1_slope() -> Result<(), Error> {
+        let map = Map::from_str(MAP)?;
+        assert_eq!(3, map.count_trees(&(6, 1)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn count_trees_in_7_1_slope() -> Result<(), Error> {
+        let map = Map::from_str(MAP)?;
+        assert_eq!(4, map.count_trees(&(7, 1)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn count_trees_in_1_2_slope() -> Result<(), Error> {
+        let map = Map::from_str(MAP)?;
+        assert_eq!(2, map.count_trees(&(1, 2)));
 
         Ok(())
     }
