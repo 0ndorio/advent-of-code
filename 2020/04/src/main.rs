@@ -1,11 +1,12 @@
 use std::{env, fs};
 
 use nom::branch::alt;
-use nom::bytes::complete::tag;
-use nom::character::complete::{alphanumeric1, digit1, space1};
-use nom::combinator::{map, opt, recognize};
+use nom::bytes::complete::{tag, take_while_m_n};
+use nom::character::complete::{digit1, space1};
+use nom::character::is_hex_digit;
+use nom::combinator::{map, map_res, recognize, verify};
 use nom::multi::{many1, separated_list0};
-use nom::sequence::preceded;
+use nom::sequence::{preceded, tuple};
 use nom::IResult;
 use std::convert::TryFrom;
 
@@ -18,14 +19,10 @@ fn main() -> Result<(), Error> {
     let passports = file_content
         .as_str()
         .split("\n\n")
-        .map(Passport::try_from)
-        .collect::<Result<Vec<Passport>, _>>()?;
+        .filter_map(|input| Passport::try_from(input).ok())
+        .count();
 
-    println!("Num Passports: {}", passports.len());
-
-    let num_valid_passports = passports.into_iter().filter(Passport::is_valid).count();
-
-    println!("Num Valid Passports: {}", num_valid_passports);
+    println!("Num Valid Passports: {}", passports);
     Ok(())
 }
 
@@ -35,30 +32,14 @@ fn main() -> Result<(), Error> {
 
 #[derive(Debug, Default)]
 struct Passport<'a> {
-    birth_year: &'a str,
+    birth_year: u32,
     country_id: &'a str,
-    expiration_year: &'a str,
+    expiration_year: u32,
     eye_color: &'a str,
     hair_color: &'a str,
-    height: &'a str,
+    height: (u32, &'a str),
     id: &'a str,
-    issue_year: &'a str,
-}
-
-impl<'a> Passport<'a> {
-    /// Check if the passport contains any default information.
-    ///
-    /// We are ignoring the `country_id` to ensure Northpole Credentials
-    /// are treated as valid passports.
-    fn is_valid(&self) -> bool {
-        !(self.birth_year.is_empty()
-            || self.expiration_year.is_empty()
-            || self.eye_color.is_empty()
-            || self.hair_color.is_empty()
-            || self.height.is_empty()
-            || self.id.is_empty()
-            || self.issue_year.is_empty())
-    }
+    issue_year: u32,
 }
 
 impl<'a> TryFrom<&'a str> for Passport<'a> {
@@ -66,41 +47,17 @@ impl<'a> TryFrom<&'a str> for Passport<'a> {
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
         fn parse_passport_entry(input: &str) -> IResult<&str, Vec<PassportEntry>> {
-            let birth_year = map(preceded(tag("byr:"), digit1), PassportEntry::BirthYear);
-            let issue_year = map(preceded(tag("iyr:"), digit1), PassportEntry::IssueYear);
-            let expiration_year = map(preceded(tag("eyr:"), digit1), PassportEntry::ExpirationYear);
-            let country_id = map(preceded(tag("cid:"), digit1), PassportEntry::CountryId);
-            let height = map(preceded(tag("hgt:"), alphanumeric1), PassportEntry::Height);
-            let eye_color = map(
-                preceded(
-                    tag("ecl:"),
-                    recognize(preceded(opt(tag("#")), alphanumeric1)),
-                ),
-                PassportEntry::EyeColor,
-            );
-            let hair_color = map(
-                preceded(
-                    tag("hcl:"),
-                    recognize(preceded(opt(tag("#")), alphanumeric1)),
-                ),
-                PassportEntry::HairColor,
-            );
-            let passport_id = map(
-                preceded(tag("pid:"), preceded(opt(tag("#")), alphanumeric1)),
-                PassportEntry::Id,
-            );
-
             separated_list0(
                 many1(alt((space1, tag("\n")))),
                 alt((
-                    birth_year,
-                    country_id,
-                    expiration_year,
-                    eye_color,
-                    hair_color,
-                    height,
-                    issue_year,
-                    passport_id,
+                    PassportEntry::parse_birth_year,
+                    PassportEntry::parse_country_id,
+                    PassportEntry::parse_expiration_year,
+                    PassportEntry::parse_eye_color,
+                    PassportEntry::parse_hair_color,
+                    PassportEntry::parse_height,
+                    PassportEntry::parse_issue_year,
+                    PassportEntry::parse_passport_id,
                 )),
             )(input)
         }
@@ -121,20 +78,111 @@ impl<'a> TryFrom<&'a str> for Passport<'a> {
             }
         }
 
+        if passport.birth_year == 0
+            || passport.issue_year == 0
+            || passport.expiration_year == 0
+            || passport.eye_color.is_empty()
+            || passport.hair_color.is_empty()
+            || passport.height.0 == 0
+            || passport.id.is_empty()
+        {
+            return Err("Missing Passport Data".into());
+        }
+
         Ok(passport)
     }
 }
 
 #[derive(Debug)]
 enum PassportEntry<'a> {
-    BirthYear(&'a str),
+    BirthYear(u32),
     CountryId(&'a str),
-    IssueYear(&'a str),
-    ExpirationYear(&'a str),
+    IssueYear(u32),
+    ExpirationYear(u32),
     EyeColor(&'a str),
     HairColor(&'a str),
-    Height(&'a str),
+    Height((u32, &'a str)),
     Id(&'a str),
+}
+
+impl<'a> PassportEntry<'a> {
+    fn parse_birth_year(input: &str) -> IResult<&str, Self> {
+        let birth_year = preceded(tag("byr:"), verify(digit1, |s: &str| s.len() == 4));
+        let birth_year = map_res(birth_year, str::parse::<u32>);
+        let birth_year = verify(birth_year, |year| (1920..=2002).contains(year));
+
+        map(birth_year, Self::BirthYear)(input)
+    }
+
+    fn parse_issue_year(input: &str) -> IResult<&str, Self> {
+        let issue_year = preceded(tag("iyr:"), verify(digit1, |s: &str| s.len() == 4));
+        let issue_year = map_res(issue_year, str::parse::<u32>);
+        let issue_year = verify(issue_year, |year| (2010..=2020).contains(year));
+
+        map(issue_year, Self::IssueYear)(input)
+    }
+
+    fn parse_expiration_year(input: &str) -> IResult<&str, Self> {
+        let expiration_year = preceded(tag("eyr:"), verify(digit1, |s: &str| s.len() == 4));
+        let expiration_year = map_res(expiration_year, str::parse::<u32>);
+        let expiration_year = verify(expiration_year, |year| (2020..=2030).contains(year));
+
+        map(expiration_year, Self::ExpirationYear)(input)
+    }
+
+    fn parse_height(input: &'a str) -> IResult<&'a str, Self> {
+        let height = preceded(tag("hgt:"), tuple((digit1, alt((tag("cm"), tag("in"))))));
+        let height = map_res(height, |(size, unit): (&str, &str)| {
+            size.parse::<u32>().map(|size| (size, unit))
+        });
+        let height = verify(height, |(size, unit): &(u32, &str)| {
+            if *unit == "cm" {
+                (150..=193).contains(size)
+            } else {
+                (59..=76).contains(size)
+            }
+        });
+
+        map(height, Self::Height)(input)
+    }
+
+    fn parse_hair_color(input: &'a str) -> IResult<&'a str, Self> {
+        let hair_color = preceded(
+            tag("hcl:"),
+            recognize(preceded(
+                tag("#"),
+                take_while_m_n(6, 6, |c: char| is_hex_digit(c as u8)),
+            )),
+        );
+
+        map(hair_color, PassportEntry::HairColor)(input)
+    }
+
+    fn parse_eye_color(input: &'a str) -> IResult<&'a str, Self> {
+        let eye_color = preceded(
+            tag("ecl:"),
+            alt((
+                tag("amb"),
+                tag("blu"),
+                tag("brn"),
+                tag("gry"),
+                tag("grn"),
+                tag("hzl"),
+                tag("oth"),
+            )),
+        );
+
+        map(eye_color, PassportEntry::EyeColor)(input)
+    }
+
+    fn parse_passport_id(input: &'a str) -> IResult<&'a str, Self> {
+        let passport_id = preceded(tag("pid:"), verify(digit1, |s: &str| s.len() == 9));
+        map(passport_id, PassportEntry::Id)(input)
+    }
+
+    fn parse_country_id(input: &'a str) -> IResult<&'a str, Self> {
+        map(preceded(tag("cid:"), digit1), PassportEntry::CountryId)(input)
+    }
 }
 
 // ------------------------------------------------------------------------------
@@ -147,27 +195,50 @@ mod tests {
 
     #[test]
     fn validate_passports() -> Result<(), Error> {
-        let passports = r#"ecl:gry pid:860033327 eyr:2020 hcl:#fffffd
-byr:1937 iyr:2017 cid:147 hgt:183cm
+        let passports = r#"pid:087499704 hgt:74in ecl:grn iyr:2012 eyr:2030 byr:1980
+hcl:#623a2f
 
-iyr:2013 ecl:amb cid:350 eyr:2023 pid:028048884
-hcl:#cfa07d byr:1929
+eyr:2029 ecl:blu cid:129 byr:1989
+iyr:2014 pid:896056539 hcl:#a97842 hgt:165cm
 
-hcl:#ae17e1 iyr:2013
-eyr:2024
-ecl:brn pid:760753108 byr:1931
-hgt:179cm
+hcl:#888785
+hgt:164cm byr:2001 iyr:2015 cid:88
+pid:545766238 ecl:hzl
+eyr:2022
 
-hcl:#cfa07d eyr:2025 pid:166559648
-iyr:2011 ecl:brn hgt:59in"#;
+iyr:2010 hgt:158cm hcl:#b6652a ecl:blu byr:1944 eyr:2021 pid:093154719"#;
 
         let num_valid_passports = passports
             .split("\n\n")
             .filter_map(|passport| Passport::try_from(passport).ok())
-            .filter(Passport::is_valid)
             .count();
 
-        assert_eq!(2, num_valid_passports);
+        assert_eq!(4, num_valid_passports);
+        Ok(())
+    }
+
+    #[test]
+    fn check_invalid_passports_are_recognized() -> Result<(), Error> {
+        let passports = r#"eyr:1972 cid:100
+hcl:#18171d ecl:amb hgt:170 pid:186cm iyr:2018 byr:1926
+
+iyr:2019
+hcl:#602927 eyr:1967 hgt:170cm
+ecl:grn pid:012533040 byr:1946
+
+hcl:dab227 iyr:2012
+ecl:brn hgt:182cm pid:021572410 eyr:2020 byr:1992 cid:277
+
+hgt:59cm ecl:zzz
+eyr:2038 hcl:74454a iyr:2023
+pid:3556412378 byr:2007"#;
+
+        let num_valid_passports = passports
+            .split("\n\n")
+            .filter_map(|passports| Passport::try_from(passports).ok())
+            .count();
+
+        assert_eq!(0, num_valid_passports);
         Ok(())
     }
 }
