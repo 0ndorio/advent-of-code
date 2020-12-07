@@ -5,13 +5,21 @@ use std::{env, fs};
 fn main() -> Result<(), Error> {
     let groups = parse_input::<Group>()?;
 
-    let num_yes_answers = groups
+    let num_yes = groups
         .iter()
         .map(Group::generate_answer_set)
         .map(|answers| answers.len())
         .sum::<usize>();
 
-    println!("Num Answers: {}", num_yes_answers);
+    println!("Total Num Yes: {}", num_yes);
+
+    let num_consent_yes = groups
+        .iter()
+        .map(Group::generate_consent_answer_set)
+        .map(|answers| answers.len())
+        .sum::<usize>();
+
+    println!("Consent Yes: {}", num_consent_yes);
     Ok(())
 }
 
@@ -29,6 +37,20 @@ impl Group {
             .flat_map(|form| form.0.iter())
             .cloned()
             .collect()
+    }
+
+    fn generate_consent_answer_set(&self) -> HashSet<char> {
+        let mut consent = HashSet::new();
+
+        for (idx, form) in self.0.iter().enumerate() {
+            if idx == 0 {
+                consent = consent.union(&form.0).cloned().collect();
+            } else {
+                consent = consent.intersection(&form.0).cloned().collect();
+            }
+        }
+
+        consent
     }
 }
 
@@ -109,6 +131,19 @@ b";
             .sum::<usize>();
 
         assert_eq!(11, num_total_answers);
+        Ok(())
+    }
+
+    #[test]
+    fn calc_consent_num_yes() -> Result<(), Error> {
+        let num_total_answers = ANSWER_LIST
+            .split("\n\n")
+            .filter_map(|entry| entry.parse::<Group>().ok())
+            .map(|group| group.generate_consent_answer_set())
+            .map(|answers| answers.len())
+            .sum::<usize>();
+
+        assert_eq!(6, num_total_answers);
         Ok(())
     }
 }
