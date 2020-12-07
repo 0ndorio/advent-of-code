@@ -5,25 +5,45 @@ use parse_display::{Display, FromStr};
 fn main() -> Result<(), Error> {
     let boarding_passes = parse_input::<BoardingPass>()?;
 
-    let max_seat_id = boarding_passes
+    let mut seat_ids = boarding_passes
         .iter()
         .map(BoardingPass::calc_seat_id)
-        .max()
-        .unwrap_or(0);
+        .collect::<Vec<_>>();
 
+    seat_ids.sort_unstable();
+
+    let max_seat_id = seat_ids.iter().max().unwrap_or(&0);
     println!("Max Set Id: {}", max_seat_id);
+
+    let mut last_id = u32::max_value();
+    let mut my_seat_id = 0;
+
+    for id in seat_ids {
+        if id == last_id + 2 {
+            my_seat_id = last_id + 1;
+            break;
+        }
+
+        last_id = id;
+    }
+
+    println!("My Seat ID: {}", my_seat_id);
 
     Ok(())
 }
 
 // ------------------------------------------------------------------------------
-// Utility
+// Plane
 // ------------------------------------------------------------------------------
 
 type RowCount = u32;
 type SeatCount = u32;
 
 const PLANE_SIZE: (RowCount, SeatCount) = (128, 8);
+
+// ------------------------------------------------------------------------------
+// BoardingPass
+// ------------------------------------------------------------------------------
 
 #[derive(Debug, Display, FromStr)]
 #[display("{row}{seat}")]
