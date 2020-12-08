@@ -27,7 +27,14 @@ fn main() -> Result<(), Error> {
         .filter(|definition| bags.contains_shiny_golden(&definition.color))
         .count();
 
-    println!("Num: {}", num_eventually_shiny_golden);
+    println!(
+        "Num Eventually Shiny Golden: {}",
+        num_eventually_shiny_golden
+    );
+    println!(
+        "Num Bags Inside Shiny Golden: {}",
+        bags.num_bags_inside_shiny_golden()
+    );
     Ok(())
 }
 
@@ -67,6 +74,28 @@ impl BagDefinitions {
 
         false
     }
+
+    fn num_bags_inside_shiny_golden(&self) -> usize {
+        let shiny_golden = BagColor(String::from(BagDefinitions::SHINY_GOLDEN));
+        let mut missing = vec![&shiny_golden];
+
+        let mut num_bags = 0;
+        while let Some(color) = missing.pop() {
+            num_bags += 1;
+
+            match self.0.get(color) {
+                Some(Bag { color: _, content }) => {
+                    for (amount, color) in content {
+                        let mut colors = std::iter::repeat(color).take(*amount).collect::<Vec<_>>();
+                        missing.append(&mut colors);
+                    }
+                }
+                None => continue,
+            }
+        }
+
+        num_bags - 1
+    }
 }
 
 impl From<Vec<Bag>> for BagDefinitions {
@@ -87,7 +116,7 @@ impl From<Vec<Bag>> for BagDefinitions {
 #[derive(Debug, PartialEq, Clone)]
 struct Bag {
     color: BagColor,
-    content: Vec<(u32, BagColor)>,
+    content: Vec<(usize, BagColor)>,
 }
 
 impl Bag {}
@@ -144,7 +173,9 @@ type Error = Box<dyn std::error::Error>;
 mod tests {
     use super::*;
 
-    const BAG_DEFINITIONS: &str = r#"light red bags contain 1 bright white bag, 2 muted yellow bags.
+    #[test]
+    fn dummy() -> Result<(), Error> {
+        const RAW_BAG_DEFINITIONS: &str = r#"light red bags contain 1 bright white bag, 2 muted yellow bags.
 dark orange bags contain 3 bright white bags, 4 muted yellow bags.
 bright white bags contain 1 shiny gold bag.
 muted yellow bags contain 2 shiny gold bags, 9 faded blue bags.
@@ -154,23 +185,43 @@ vibrant plum bags contain 5 faded blue bags, 6 dotted black bags.
 faded blue bags contain no other bags.
 dotted black bags contain no other bags."#;
 
-    #[test]
-    fn dummy() -> Result<(), Error> {
-        let bag_definitions = BAG_DEFINITIONS
+        let bags = RAW_BAG_DEFINITIONS
             .lines()
             .map(Bag::try_from)
             .collect::<Result<Vec<_>, _>>()?;
 
-        assert_eq!(9, bag_definitions.len());
+        assert_eq!(9, bags.len());
 
-        let bags = BagDefinitions::from(bag_definitions.clone());
-        let num_eventually_shiny_golden = bag_definitions
+        let bag_definitions = BagDefinitions::from(bags.clone());
+        let num_eventually_shiny_golden = bags
             .into_iter()
-            .filter(|definition| bags.contains_shiny_golden(&definition.color))
+            .filter(|definition| bag_definitions.contains_shiny_golden(&definition.color))
             .count();
 
         assert_eq!(4, num_eventually_shiny_golden);
 
+        Ok(())
+    }
+
+    #[test]
+    fn count_num_bags_inside_shiny_golden() -> Result<(), Error> {
+        const RAW_BAG_DEFINITIONS: &str = r#"shiny gold bags contain 2 dark red bags.
+dark red bags contain 2 dark orange bags.
+dark orange bags contain 2 dark yellow bags.
+dark yellow bags contain 2 dark green bags.
+dark green bags contain 2 dark blue bags.
+dark blue bags contain 2 dark violet bags.
+dark violet bags contain no other bags."#;
+
+        let bags = RAW_BAG_DEFINITIONS
+            .lines()
+            .map(Bag::try_from)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let bag_definitions = BagDefinitions::from(bags.clone());
+        let num_bags = bag_definitions.num_bags_inside_shiny_golden();
+
+        assert_eq!(126, num_bags);
         Ok(())
     }
 }
