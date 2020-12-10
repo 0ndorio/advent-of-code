@@ -5,8 +5,13 @@ use itertools::Itertools;
 fn main() -> Result<(), Error> {
     let numbers = parse_input::<u64>()?;
 
-    let weak_number = XMAS::find_weak_number(25, &numbers).unwrap_or_default();
+    let weak_number =
+        XMAS::find_weak_number(25, &numbers).ok_or("Couldn't determine weak number.")?;
     println!("The Weak Number is: {}", weak_number);
+
+    let encryption_weakness = XMAS::find_encryption_weakness(weak_number, &numbers)
+        .ok_or("Couldn't determine encryption weakness")?;
+    println!("The Encryption Weakness is: {}", encryption_weakness);
 
     Ok(())
 }
@@ -43,6 +48,34 @@ impl XMAS {
 
         None
     }
+
+    fn find_encryption_weakness(weak_number: u64, numbers: impl AsRef<[u64]>) -> Option<u64> {
+        let numbers = numbers.as_ref();
+
+        let (weak_index, _) = numbers
+            .iter()
+            .find_position(|&&number| number == weak_number)?;
+
+        for index in 0..weak_index - 2 {
+            for chunk_size in 2..weak_index {
+                let chunk = numbers
+                    .iter()
+                    .skip(index)
+                    .take(chunk_size)
+                    .cloned()
+                    .collect::<Vec<_>>();
+
+                if weak_number == chunk.iter().sum::<u64>() {
+                    let min_value = chunk.iter().min()?;
+                    let max_value = chunk.iter().max()?;
+
+                    return Some(min_value + max_value);
+                }
+            }
+        }
+
+        None
+    }
 }
 
 // ------------------------------------------------------------------------------
@@ -68,31 +101,30 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use itertools::__std_iter::Iterator;
+
+    const SEQUENCE: &str = "35
+                            20
+                            15
+                            25
+                            47
+                            40
+                            62
+                            55
+                            65
+                            95
+                            102
+                            117
+                            150
+                            182
+                            127
+                            219
+                            299
+                            277
+                            309
+                            576";
 
     #[test]
-    fn find_weak_byte_in_sequence() -> Result<(), Error> {
-        const SEQUENCE: &str = "35
-                                20
-                                15
-                                25
-                                47
-                                40
-                                62
-                                55
-                                65
-                                95
-                                102
-                                117
-                                150
-                                182
-                                127
-                                219
-                                299
-                                277
-                                309
-                                576";
-
+    fn break_xmas_cipher() -> Result<(), Error> {
         let number_sequence = SEQUENCE
             .lines()
             .map(str::trim)
@@ -101,6 +133,10 @@ mod tests {
 
         let weak_entry = XMAS::find_weak_number(5, &number_sequence).unwrap();
         assert_eq!(127, weak_entry);
+
+        let encryption_weakness =
+            XMAS::find_encryption_weakness(weak_entry, &number_sequence).unwrap();
+        assert_eq!(62, encryption_weakness);
 
         Ok(())
     }
