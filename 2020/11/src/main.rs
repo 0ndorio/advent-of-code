@@ -68,6 +68,47 @@ impl Map {
         row.0.get(column).cloned()
     }
 
+    fn trace_view(&self, position: (usize, usize), direction: (i32, i32)) -> Tile {
+        if direction == (0, 0) {
+            return self
+                .get_tile(position.0, position.1)
+                .expect("trace failed cause of wrong initial position");
+        }
+
+        let mut position = position;
+        loop {
+            let (update, out_of_map) = match direction.0 {
+                row if row > 0 => position.0.overflowing_add(1),
+                0 => position.0.overflowing_add(0),
+                _ => position.0.overflowing_sub(1),
+            };
+
+            if out_of_map {
+                return Tile::EmptySeat;
+            } else {
+                position.0 = update;
+            }
+
+            let (update, out_of_map) = match direction.1 {
+                column if column > 0 => position.1.overflowing_add(1),
+                0 => position.1.overflowing_add(0),
+                _ => position.1.overflowing_sub(1),
+            };
+
+            if out_of_map {
+                return Tile::EmptySeat;
+            } else {
+                position.1 = update;
+            }
+
+            match self.get_tile(position.0, position.1) {
+                Some(Tile::Floor) => {}
+                Some(seat) => return seat,
+                None => return Tile::EmptySeat,
+            }
+        }
+    }
+
     fn update_tile(&self, row: usize, column: usize) -> Tile {
         let tile = self.map[row].0[column];
         if tile.is_floor() {
@@ -83,9 +124,17 @@ impl Map {
         let mut adjacent_tiles = vec![];
         for adjacent_row in min_row..=max_row {
             for adjacent_column in min_column..=max_column {
-                if let Some(tile) = self.get_tile(adjacent_row, adjacent_column) {
-                    adjacent_tiles.push(tile);
-                }
+                let mut row_direction =
+                    i32::try_from(adjacent_row).expect("num rows is way to large");
+                row_direction -= i32::try_from(row).expect("num rows is way to large");
+
+                let mut column_direction =
+                    i32::try_from(adjacent_column).expect("num columns is way to large");
+                column_direction -= i32::try_from(column).expect("num columns is way to large");
+
+                let direction = (row_direction, column_direction);
+                let tile = self.trace_view((row, column), direction);
+                adjacent_tiles.push(tile);
             }
         }
 
@@ -98,7 +147,7 @@ impl Map {
             return Tile::OccupiedSeat;
         }
 
-        if tile.is_occupied_seat() && num_occupied >= 5 {
+        if tile.is_occupied_seat() && num_occupied >= 6 {
             return Tile::EmptySeat;
         }
 
@@ -250,7 +299,7 @@ mod tests {
         let mut map = Map::new(rows);
         let num_occupied = map.advance_until_stall();
 
-        assert_eq!(37, num_occupied);
+        assert_eq!(26, num_occupied);
         Ok(())
     }
 }
